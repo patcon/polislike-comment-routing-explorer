@@ -312,23 +312,56 @@
             if (pcaData.pca && pcaData.pca['comment-extremity']) {
               console.log('Found comment-extremity data:', pcaData.pca['comment-extremity'].length, 'entries');
             }
+            if (pcaData['comment-priorities']) {
+              console.log('Found comment-priorities data:', Object.keys(pcaData['comment-priorities']).length, 'entries');
+            }
           } catch (pcaError) {
             console.warn('Could not parse PCA data:', pcaError);
             pcaData = null;
           }
         }
 
-        // --- table header reordered: agree, pass, disagree ---
-        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th></tr></thead><tbody>';
+        // --- table header reordered: agree, pass, disagree, extremity, comment-priorities ---
+        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th><th class="small">Extremity</th><th class="small">Priority</th></tr></thead><tbody>';
 
-        comments.forEach(c => {
+        // Sort comments by statement ID (tid) before displaying
+        const sortedComments = comments.sort((a, b) => {
+          const tidA = parseInt(a.tid) || 0;
+          const tidB = parseInt(b.tid) || 0;
+          return tidA - tidB;
+        });
+
+        sortedComments.forEach(c => {
           const text = String(c.txt || '').replace(/[\r\n]+/g, ' ').slice(0, 120);
+          const statementId = parseInt(c.tid) || 0;
+
+          // Get extremity value if available
+          let extremityValue = '';
+          if (pcaData && pcaData.pca && pcaData.pca['comment-extremity']) {
+            const extremityArray = pcaData.pca['comment-extremity'];
+            if (statementId >= 0 && statementId < extremityArray.length && extremityArray[statementId] !== null && extremityArray[statementId] !== undefined) {
+              extremityValue = extremityArray[statementId].toFixed(2);
+            }
+          }
+
+          // Get comment-priorities value if available (not in pca sublevel)
+          let commentPriority = '';
+          if (pcaData && pcaData['comment-priorities']) {
+            const priorityObject = pcaData['comment-priorities'];
+            const priorityValue = priorityObject[statementId.toString()];
+            if (priorityValue !== null && priorityValue !== undefined) {
+              commentPriority = priorityValue.toFixed(2);
+            }
+          }
+
           html += `<tr data-agree='${c.agree_count}' data-pass='${c.pass_count}' data-disagree='${c.disagree_count}'>` +
                   `<td>${c.tid}</td>` +
                   `<td>${text}</td>` +
                   `<td class="small">${c.agree_count}</td>` +
                   `<td class="small">${c.pass_count}</td>` +
                   `<td class="small">${c.disagree_count}</td>` +
+                  `<td class="small">${extremityValue}</td>` +
+                  `<td class="small">${commentPriority}</td>` +
                   `</tr>`;
         });
 
