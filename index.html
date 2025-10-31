@@ -204,12 +204,21 @@
         localStorage.setItem('commentsJSON', commentsInput.value);
         localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
-        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Disagree</th><th class="small">Pass</th></tr></thead><tbody>';
+
+        // --- table header reordered: agree, pass, disagree ---
+        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th></tr></thead><tbody>';
+
         comments.forEach(c => {
           const text = String(c.txt || '').replace(/[\r\n]+/g, ' ').slice(0, 120);
-          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>` +
-                  `<td>${c.tid}</td><td>${text}</td><td class="small">${c.agree_count}</td><td class="small">${c.disagree_count}</td><td class="small">${c.pass_count}</td></tr>`;
+          html += `<tr data-agree='${c.agree_count}' data-pass='${c.pass_count}' data-disagree='${c.disagree_count}'>` +
+                  `<td>${c.tid}</td>` +
+                  `<td>${text}</td>` +
+                  `<td class="small">${c.agree_count}</td>` +
+                  `<td class="small">${c.pass_count}</td>` +
+                  `<td class="small">${c.disagree_count}</td>` +
+                  `</tr>`;
         });
+
         html += '</tbody></table>';
         commentsTableContainer.innerHTML = html;
         document.getElementById('dataSection').open = false;
@@ -217,12 +226,14 @@
         commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row => {
           row.addEventListener('click', () => {
             const agree = Number(row.dataset.agree);
-            const disagree = Number(row.dataset.disagree);
             const pass = Number(row.dataset.pass);
+            const disagree = Number(row.dataset.disagree);
             updateTooltipsRawCounts(agree, pass, disagree);
           });
         });
-      } catch (e) { alert('Invalid JSON data: ' + e.message); }
+      } catch (e) {
+        alert('Invalid JSON data: ' + e.message);
+      }
     });
   </script>
 </body>
