@@ -11,6 +11,17 @@
       padding: 2em;
       background: #fafafa;
     }
+    details {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 1em;
+      border-radius: 6px;
+      margin-bottom: 1.5em;
+    }
+    .links {
+      display: flex;
+      gap: 1em;
+    }
     .slider-wrapper {
       margin-bottom: 2em;
     }
@@ -23,11 +34,38 @@
       padding: 1em;
       border-radius: 6px;
     }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      margin-top: 0.5em;
+    }
+    button {
+      margin-top: 0.5em;
+      padding: 0.5em 1em;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <h1>Polis Metric Playground</h1>
-  <p>Experiment with a multi-handle slider to represent multiple response types.</p>
+  <p>Experiment with sliders to see how values affect the Polis importance and priority metrics. Values persist locally between refreshes.</p>
+
+  <details id="dataSection" open>
+    <summary><strong>Load Polis Data</strong></summary>
+    <label for="conversationId">Conversation ID:</label><br>
+    <input type="text" id="conversationId" placeholder="e.g. 6bkf4ujff9" style="width:200px;" /><br>
+
+    <button id="loadData">Generate URLs</button>
+
+    <div id="dataLinks" style="display:none; margin-top:1em;">
+      <div class="links">
+        <p><a id="commentsUrl" href="#" target="_blank" rel="noreferrer noopener">Comments JSON</a></p>
+        <p><a id="pcaUrl" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a></p>
+      </div>
+      <textarea id="dataInput" placeholder="Paste JSON response here..."></textarea><br>
+      <button id="useData">Use Data</button>
+    </div>
+  </details>
 
   <div class="slider-wrapper">
     <label>Response Distribution</label>
@@ -47,18 +85,21 @@
   <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.js"></script>
   <script>
     const multiSlider = document.getElementById('multiSlider');
+    const extremitySlider = document.getElementById('extremitySlider');
+
+    const savedMulti = JSON.parse(localStorage.getItem('multiSliderValues')) || [20, 50, 80];
+    const savedExt = JSON.parse(localStorage.getItem('extremityValue')) || 50;
 
     noUiSlider.create(multiSlider, {
-      start: [20, 50, 80],
+      start: savedMulti,
       connect: [false, true, true, false],
       tooltips: [true, true, true],
       range: { 'min': 0, 'max': 100 },
       step: 1
     });
 
-    const extremitySlider = document.getElementById('extremitySlider');
     noUiSlider.create(extremitySlider, {
-      start: [50],
+      start: [savedExt],
       tooltips: [true],
       range: { 'min': 0, 'max': 100 }
     });
@@ -123,16 +164,49 @@
     mergeTooltips(multiSlider, 15, ' | ');
 
     const valuesDiv = document.getElementById('values');
+
     const updateValues = () => {
-      const [a, b, c] = multiSlider.noUiSlider.get().map(Number);
-      const ext = Number(extremitySlider.noUiSlider.get());
-      valuesDiv.textContent = `Handles: ${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)} | Extremity: ${ext.toFixed(1)}`;
+      const multiValues = multiSlider.noUiSlider.get().map(Number);
+      const extValue = Number(extremitySlider.noUiSlider.get());
+      localStorage.setItem('multiSliderValues', JSON.stringify(multiValues));
+      localStorage.setItem('extremityValue', JSON.stringify(extValue));
+      valuesDiv.textContent = `Handles: ${multiValues.map(v => v.toFixed(1)).join(', ')} | Extremity: ${extValue.toFixed(1)}`;
     };
 
     multiSlider.noUiSlider.on('update', updateValues);
     extremitySlider.noUiSlider.on('update', updateValues);
 
     updateValues();
+
+    const convoIdInput = document.getElementById('conversationId');
+    const loadDataBtn = document.getElementById('loadData');
+    const dataLinks = document.getElementById('dataLinks');
+    const commentsUrl = document.getElementById('commentsUrl');
+    const pcaUrl = document.getElementById('pcaUrl');
+    const dataInput = document.getElementById('dataInput');
+    const useDataBtn = document.getElementById('useData');
+    const dataSection = document.getElementById('dataSection');
+
+    loadDataBtn.addEventListener('click', () => {
+      const id = convoIdInput.value.trim();
+      if (!id) return alert('Please enter a conversation ID.');
+      const commentsLink = `https://pol.is/api/v3/comments?conversation_id=${id}&moderation=true&include_voting_patterns=true`;
+      const pcaLink = `https://pol.is/api/v3/math/pca2?conversation_id=${id}`;
+      commentsUrl.href = commentsLink;
+      pcaUrl.href = pcaLink;
+      dataLinks.style.display = 'block';
+    });
+
+    useDataBtn.addEventListener('click', () => {
+      if (!dataInput.value.trim()) return alert('Please paste JSON data first.');
+      try {
+        const parsed = JSON.parse(dataInput.value);
+        console.log('Loaded Polis data sample:', parsed);
+        dataSection.open = false;
+      } catch (e) {
+        alert('Invalid JSON.');
+      }
+    });
   </script>
 </body>
 </html>
