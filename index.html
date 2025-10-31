@@ -6,192 +6,216 @@
   <title>Polis Metric Playground</title>
   <link href="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.css" rel="stylesheet">
   <style>
-    body { font‑family: sans‑serif; padding: 2em; background: #fafafa; }
-    details { background: #fff; border: 1px solid #ccc; padding: 1em; border‑radius: 6px; margin‑bottom: 1.5em; }
-    .links { display: flex; gap: 1em; }
-    .slider-wrapper { margin‑bottom: 2em; }
-    #multiSlider, #extremitySlider { margin‑top: 1em; }
-    .output { background: #fff; border: 1px solid #ccc; padding: 1em; border‑radius: 6px; }
-    textarea { width: 48%; min‑height: 100px; margin‑top: 0.5em; }
-    .textarea-container { display: flex; gap:1em; }
-    .comments-table { max-height:200px; overflow-y:auto; border:1px solid #ccc; margin‑top:1em; }
-    .comments-table table { width:100%; border-collapse: collapse; }
-    .comments‑table th, .comments‑table td { border:1px solid #ddd; padding:4px 8px; }
-    .comments‑table tr:hover { background:#f0f0f0; cursor:pointer; }
-    button { margin‑top:0.5em; padding:0.5em 1em; cursor:pointer; }
-    .c‑agree { background: green; }
-    .c‑pass { background: yellow; }
-    .c‑disagree { background: red; }
-    .c‑empty { background: white; }
+    :root{
+      --bg: #fafafa; --card:#ffffff; --muted:#666; --accent:#0b5fff;
+      --agree: #16a34a; --pass: #f59e0b; --disagree: #ef4444; --empty: #ffffff;
+      --radius: 8px; --gap: 12px;
+    }
+    html,body{height:100%;}
+    body{font-family: Inter, Roboto, system-ui, -apple-system, 'Segoe UI', Arial; background:var(--bg); margin:0; padding:24px; color:#0f172a}
+    h1{margin:0 0 8px 0; font-size:20px}
+    p.lead{margin:0 0 18px 0; color:var(--muted)}
+
+    /* container */
+    .panel{max-width:1100px; margin:0 auto;}
+    details{background:var(--card); border:1px solid #e6e9ef; padding:14px; border-radius:var(--radius); margin-bottom:14px}
+    summary{font-weight:600; cursor:pointer}
+
+    .row{display:flex; gap:var(--gap); align-items:flex-start}
+    .col{flex:1}
+    .col.small{flex:0 0 260px}
+
+    label{font-size:13px;color:var(--muted)}
+    input[type="text"]{width:100%; padding:8px;border-radius:6px;border:1px solid #dde3ef}
+    .btn{background:var(--accent); color:white; border:none; padding:8px 12px;border-radius:6px; cursor:pointer}
+    .links{display:flex; gap:8px; margin-top:8px}
+    .link{font-size:13px; color:var(--accent); text-decoration:none}
+
+    .textarea-container{display:flex; gap:12px}
+    textarea{width:100%; min-height:120px; padding:10px; border-radius:6px; border:1px solid #e6e9ef; font-family: monospace; font-size:13px}
+
+    .controls{background:var(--card); border:1px solid #e6e9ef; padding:14px; border-radius:var(--radius); margin-bottom:14px}
+    .slider-wrapper{margin-bottom:12px}
+    .output{background:var(--card); border:1px solid #e6e9ef; padding:12px; border-radius:6px}
+
+    /* comments table visible below */
+    .comments-table{background:var(--card); border:1px solid #e6e9ef; border-radius:6px; overflow:auto; max-height:320px}
+    table{width:100%; border-collapse:collapse}
+    th,td{padding:8px 10px; border-bottom:1px solid #f2f4f7; text-align:left; font-size:13px}
+    tr:hover{background:#f8fafc; cursor:pointer}
+    td.small{width:90px; font-variant-numeric:tabular-nums}
+
+    /* slider connect colors */
+    .noUi-connect.c-empty{background:var(--empty) !important}
+    .noUi-connect.c-agree{background:var(--agree) !important}
+    .noUi-connect.c-pass{background:var(--pass) !important}
+    .noUi-connect.c-disagree{background:var(--disagree) !important}
+
+    footer{margin-top:18px; color:var(--muted); font-size:13px}
+    @media (max-width:880px){ .row{flex-direction:column} .col.small{flex:1} .textarea-container{flex-direction:column} }
   </style>
 </head>
 <body>
-  <h1>Polis Metric Playground</h1>
-  <p>Experiment with sliders to see how values affect the Polis importance and priority metrics. Data fields persist between refreshes.</p>
+  <div class="panel">
+    <h1>Polis Metric Playground</h1>
+    <p class="lead">Interactive slider &amp; simple table to explore Polis metrics. Paste API JSON (from the <code>curl</code> commands) into the boxes and click <em>Use Data</em>.</p>
 
-  <details id="dataSection" open>
-    <summary><strong>Load Polis Data</strong></summary>
-    <label for="conversationId">Conversation ID:</label><br>
-    <input type="text" id="conversationId" placeholder="e.g. 6bkf4ujff9" style="width:200px;"><br>
-    <button id="loadData">Generate URLs</button>
+    <details id="dataSection" open>
+      <summary><strong>Load Polis Data</strong></summary>
+      <div style="margin-top:12px" class="row">
+        <div class="col small">
+          <label for="conversationId">Conversation ID</label>
+          <input id="conversationId" type="text" placeholder="e.g. 6bkf4ujff9">
+          <div style="height:8px"></div>
+          <button id="loadData" class="btn">Generate URLs</button>
+          <div class="links" id="linkRow" style="display:none">
+            <a id="commentsUrl" class="link" href="#" target="_blank" rel="noreferrer noopener">Comments JSON</a>
+            <a id="pcaUrl" class="link" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a>
+          </div>
+        </div>
 
-    <div id="dataLinks" style="display:none; margin-top:1em;">
-      <div class="links">
-        <a id="commentsUrl" href="#" target="_blank" rel="noreferrer noopener">Comments JSON</a>
-        <a id="pcaUrl" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a>
+        <div class="col">
+          <label>Paste API responses</label>
+          <div class="textarea-container">
+            <textarea id="commentsInput" placeholder="Paste comments JSON here…"></textarea>
+            <textarea id="pcaInput" placeholder="Paste PCA2 JSON here…"></textarea>
+          </div>
+          <div style="margin-top:8px"><button id="useData" class="btn">Use Data</button></div>
+        </div>
       </div>
-      <div class="textarea-container">
-        <textarea id="commentsInput" placeholder="Paste comments JSON here…"></textarea>
-        <textarea id="pcaInput" placeholder="Paste PCA2 JSON here…"></textarea>
+    </details>
+
+    <!-- table must be visible after load -->
+    <div class="comments-table" id="commentsTableContainer" style="margin-bottom:14px"></div>
+
+    <div class="controls">
+      <div class="slider-wrapper">
+        <label>Response Distribution (green=agree, yellow=pass, red=disagree, white=remaining)</label>
+        <div id="multiSlider" style="margin-top:10px"></div>
       </div>
-      <button id="useData">Use Data</button>
-      <div class="comments-table" id="commentsTableContainer"></div>
+
+      <div class="slider-wrapper">
+        <label>Extremity Weight</label>
+        <div id="extremitySlider" style="margin-top:10px"></div>
+      </div>
+
+      <div class="output">
+        <strong>Values:</strong>
+        <div id="values"></div>
+      </div>
     </div>
-  </details>
 
-  <div class="slider-wrapper">
-    <label>Response Distribution (green = agree, yellow = pass, red = disagree, white = remaining)</label>
-    <div id="multiSlider"></div>
-  </div>
-
-  <div class="slider-wrapper">
-    <label>Extremity Weight</label>
-    <div id="extremitySlider"></div>
-  </div>
-
-  <div class="output">
-    <strong>Values:</strong>
-    <div id="values"></div>
+    <footer>Tip: click any row in the table to populate the slider with that comment's counts.</footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.js"></script>
   <script>
     const multiSlider = document.getElementById('multiSlider');
     const extremitySlider = document.getElementById('extremitySlider');
+    const convoIdInput = document.getElementById('conversationId');
+    const commentsInput = document.getElementById('commentsInput');
+    const pcaInput = document.getElementById('pcaInput');
+    const loadDataBtn = document.getElementById('loadData');
+    const useDataBtn = document.getElementById('useData');
+    const commentsTableContainer = document.getElementById('commentsTableContainer');
+    const linkRow = document.getElementById('linkRow');
 
-    const savedConvoId = localStorage.getItem('conversationId') || '';
-    const savedComments = localStorage.getItem('commentsJSON') || '';
-    const savedPCA = localStorage.getItem('pcaJSON') || '';
+    // restore saved inputs (only conversation and pasted JSON)
+    convoIdInput.value = localStorage.getItem('conversationId') || '';
+    commentsInput.value = localStorage.getItem('commentsJSON') || '';
+    pcaInput.value = localStorage.getItem('pcaJSON') || '';
 
-    document.getElementById('conversationId').value = savedConvoId;
-    document.getElementById('commentsInput').value = savedComments;
-    document.getElementById('pcaInput').value = savedPCA;
-
-    // Configure 4 handles: 0, agree, agree+pass, total – which gives 3 connecting segments
+    // create slider: 4 handles -> connect array length = handles + 1 = 5
     noUiSlider.create(multiSlider, {
       start: [0, 20, 70, 100],
-      connect: [false, true, true, true, false], // must have length = handles + 1 = 5
+      connect: [false, true, true, true, false],
       tooltips: [true, true, true, true],
       range: { min: 0, max: 100 },
       step: 1
     });
 
-    const updateConnectColors = () => {
-      const connectElems = multiSlider.querySelectorAll('.noUi-connect');
-      // With 5 connect booleans, there will be 5‑1=4 connects
-      if (connectElems.length === 4) {
-        connectElems[0].className = 'noUi-connect c-empty';      // between min and first handle
-        connectElems[1].className = 'noUi-connect c-agree';
-        connectElems[2].className = 'noUi-connect c-pass';
-        connectElems[3].className = 'noUi-connect c-disagree';
+    function updateConnectColors(){
+      const connects = multiSlider.querySelectorAll('.noUi-connect');
+      if(connects.length === 4){
+        connects[0].className = 'noUi-connect c-empty';
+        connects[1].className = 'noUi-connect c-agree';
+        connects[2].className = 'noUi-connect c-pass';
+        connects[3].className = 'noUi-connect c-disagree';
       }
-    };
-
+    }
     updateConnectColors();
 
+    // show diffs in handle tooltips (handle0 is empty)
     multiSlider.noUiSlider.on('update', (values) => {
       const v = values.map(Number);
-      // differences for segments (skip the first segment maybe)
-      const diffs = [
-        v[1] - v[0],
-        v[2] - v[1],
-        v[3] - v[2]
-      ];
+      const diffs = [v[1]-v[0], v[2]-v[1], v[3]-v[2]];
       const tooltips = multiSlider.noUiSlider.getTooltips();
-      // Skip first handle tooltip or use a dummy
-      tooltips.forEach((tooltip, i) => {
-        if (tooltip) {
-          if (i === 0) {
-            tooltip.innerHTML = '';          // no meaningful value for handle[0]
-          } else {
-            tooltip.innerHTML = diffs[i-1].toFixed(1);
-          }
-        }
+      tooltips.forEach((t,i)=>{
+        if(!t) return;
+        if(i===0) { t.innerHTML = ''; } else { t.innerHTML = diffs[i-1].toFixed(0); }
       });
       updateConnectColors();
     });
 
-    noUiSlider.create(extremitySlider, {
-      start: [50],
-      tooltips: [true],
-      range: { min: 0, max: 100 }
-    });
+    noUiSlider.create(extremitySlider, { start: [50], tooltips: [true], range: { min: 0, max: 100 } });
 
-    const valuesDiv = document.getElementById('values');
-    const updateValues = () => {
-      const multiVals = multiSlider.noUiSlider.get().map(Number);
-      const extVal = Number(extremitySlider.noUiSlider.get());
-      valuesDiv.textContent = `Handles: ${multiVals.map(v => v.toFixed(1)).join(', ')} | Extremity: ${extVal.toFixed(1)}`;
-    };
-
+    function updateValues(){
+      const multi = multiSlider.noUiSlider.get().map(Number);
+      const ext = Number(extremitySlider.noUiSlider.get());
+      document.getElementById('values').textContent = `Handles: ${multi.map(v=>v.toFixed(0)).join(', ')} | Extremity: ${ext.toFixed(0)}`;
+    }
     multiSlider.noUiSlider.on('update', updateValues);
     extremitySlider.noUiSlider.on('update', updateValues);
     updateValues();
 
-    const convoIdInput = document.getElementById('conversationId');
-    const loadDataBtn = document.getElementById('loadData');
-    const dataLinks = document.getElementById('dataLinks');
-    const commentsUrl = document.getElementById('commentsUrl');
-    const pcaUrl = document.getElementById('pcaUrl');
-    const commentsInput = document.getElementById('commentsInput');
-    const pcaInput = document.getElementById('pcaInput');
-    const useDataBtn = document.getElementById('useData');
-    const commentsTableContainer = document.getElementById('commentsTableContainer');
-    const dataSection = document.getElementById('dataSection');
-
-    loadDataBtn.addEventListener('click', () => {
+    // load data links
+    loadDataBtn.addEventListener('click', ()=>{
       const id = convoIdInput.value.trim();
-      if (!id) return alert('Please enter a conversation ID.');
+      if(!id) return alert('enter conversation id');
       localStorage.setItem('conversationId', id);
       const commentsLink = `https://pol.is/api/v3/comments?conversation_id=${id}&moderation=true&include_voting_patterns=true`;
       const pcaLink = `https://pol.is/api/v3/math/pca2?conversation_id=${id}`;
-      commentsUrl.href = commentsLink;
-      pcaUrl.href = pcaLink;
-      dataLinks.style.display = 'block';
+      document.getElementById('commentsUrl').href = commentsLink;
+      document.getElementById('pcaUrl').href = pcaLink;
+      linkRow.style.display = 'flex';
     });
 
-    useDataBtn.addEventListener('click', () => {
-      if (!commentsInput.value.trim() || !pcaInput.value.trim()) {
-        return alert('Please paste both JSON data.');
-      }
-      try {
+    // Use pasted data and populate table (table visible outside details)
+    useDataBtn.addEventListener('click', ()=>{
+      if(!commentsInput.value.trim()) return alert('paste comments JSON');
+      try{
         localStorage.setItem('commentsJSON', commentsInput.value);
         localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
-        dataSection.open = false;
-
-        let html = '<table><thead><tr><th>ID</th><th>Text</th><th>Agree</th><th>Disagree</th><th>Pass</th></tr></thead><tbody>';
-        comments.forEach(c => {
-          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>` +
-                  `<td>${c.tid}</td><td>${c.txt}</td><td>${c.agree_count}</td><td>${c.disagree_count}</td><td>${c.pass_count}</td></tr>`;
+        // build compact table
+        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Disagree</th><th class="small">Pass</th></tr></thead><tbody>';
+        comments.forEach(c=>{
+          const text = String(c.txt||'').replace(/\n/g,' ').slice(0,120);
+          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>`+
+                  `<td>${c.tid}</td><td>${text}</td><td class="small">${c.agree_count}</td><td class="small">${c.disagree_count}</td><td class="small">${c.pass_count}</td></tr>`;
         });
         html += '</tbody></table>';
         commentsTableContainer.innerHTML = html;
-
-        commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row => {
-          row.addEventListener('click', () => {
+        // collapse details
+        document.getElementById('dataSection').open = false;
+        // attach click handlers
+        commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row=>{
+          row.addEventListener('click', ()=>{
             const agree = Number(row.dataset.agree);
             const disagree = Number(row.dataset.disagree);
             const pass = Number(row.dataset.pass);
-            const total = agree + disagree + pass;
-            // Set slider: 0, agree, agree+pass, total (or 100) depending on total
-            multiSlider.noUiSlider.set([0, agree, agree + pass, 100]);
+            // total as percent of 100; if sum==0 show zeros
+            const sum = agree+disagree+pass;
+            if(sum===0){ multiSlider.noUiSlider.set([0,0,0,100]); return; }
+            // scale to 0..100
+            const a = (agree/sum)*100;
+            const p = (pass/sum)*100;
+            const d = (disagree/sum)*100;
+            const v0 = 0, v1 = Math.round(a), v2 = Math.round(a+p), v3 = 100;
+            multiSlider.noUiSlider.set([v0,v1,v2,v3]);
           });
         });
-
-      } catch(e) {
-        alert('Invalid JSON data');
-      }
+      }catch(e){ alert('Invalid JSON data: '+e.message); }
     });
   </script>
 </body>
