@@ -35,9 +35,31 @@
       border-radius: 6px;
     }
     textarea {
-      width: 100%;
+      width: 48%;
       min-height: 100px;
       margin-top: 0.5em;
+    }
+    .textarea-container {
+      display: flex;
+      gap: 1em;
+    }
+    .comments-table {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      margin-top: 1em;
+    }
+    .comments-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .comments-table th, .comments-table td {
+      border: 1px solid #ddd;
+      padding: 4px 8px;
+    }
+    .comments-table tr:hover {
+      background: #f0f0f0;
+      cursor: pointer;
     }
     button {
       margin-top: 0.5em;
@@ -59,16 +81,20 @@
 
     <div id="dataLinks" style="display:none; margin-top:1em;">
       <div class="links">
-        <p><a id="commentsUrl" href="#" target="_blank" rel="noreferrer noopener">Comments JSON</a></p>
-        <p><a id="pcaUrl" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a></p>
+        <a id="commentsUrl" href="#" target="_blank" rel="noreferrer noopener">Comments JSON</a>
+        <a id="pcaUrl" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a>
       </div>
-      <textarea id="dataInput" placeholder="Paste JSON response here..."></textarea><br>
+      <div class="textarea-container">
+        <textarea id="commentsInput" placeholder="Paste comments JSON here..."></textarea>
+        <textarea id="pcaInput" placeholder="Paste PCA2 JSON here..."></textarea>
+      </div>
       <button id="useData">Use Data</button>
+      <div class="comments-table" id="commentsTableContainer"></div>
     </div>
   </details>
 
   <div class="slider-wrapper">
-    <label>Response Distribution</label>
+    <label>Response Distribution (green=agree, red=disagree, yellow=pass, white=remaining)</label>
     <div id="multiSlider"></div>
   </div>
 
@@ -95,7 +121,12 @@
       connect: [false, true, true, false],
       tooltips: [true, true, true],
       range: { 'min': 0, 'max': 100 },
-      step: 1
+      step: 1,
+      pips: {
+        mode: 'values',
+        values: [0, 100],
+        density: 100
+      }
     });
 
     noUiSlider.create(extremitySlider, {
@@ -104,67 +135,7 @@
       range: { 'min': 0, 'max': 100 }
     });
 
-    function mergeTooltips(slider, threshold, separator) {
-      const textIsRtl = getComputedStyle(slider).direction === 'rtl';
-      const isRtl = slider.noUiSlider.options.direction === 'rtl';
-      const isVertical = slider.noUiSlider.options.orientation === 'vertical';
-      const tooltips = slider.noUiSlider.getTooltips();
-      const origins = slider.noUiSlider.getOrigins();
-
-      tooltips.forEach((tooltip, index) => {
-        if (tooltip) origins[index].appendChild(tooltip);
-      });
-
-      slider.noUiSlider.on('update', (values, handle, unencoded, tap, positions) => {
-        const pools = [[]], poolPositions = [[]], poolValues = [[]];
-        let atPool = 0;
-
-        if (tooltips[0]) {
-          pools[0][0] = 0;
-          poolPositions[0][0] = positions[0];
-          poolValues[0][0] = values[0];
-        }
-
-        for (let i = 1; i < positions.length; i++) {
-          if (!tooltips[i] || (positions[i] - positions[i - 1]) > threshold) {
-            atPool++;
-            pools[atPool] = [];
-            poolValues[atPool] = [];
-            poolPositions[atPool] = [];
-          }
-          if (tooltips[i]) {
-            pools[atPool].push(i);
-            poolValues[atPool].push(values[i]);
-            poolPositions[atPool].push(positions[i]);
-          }
-        }
-
-        pools.forEach((pool, poolIndex) => {
-          const handlesInPool = pool.length;
-          for (let j = 0; j < handlesInPool; j++) {
-            const handleNumber = pool[j];
-            if (j === handlesInPool - 1) {
-              let offset = 0;
-              poolPositions[poolIndex].forEach(v => offset += 1000 - v);
-              const direction = isVertical ? 'bottom' : 'right';
-              const last = isRtl ? 0 : handlesInPool - 1;
-              const lastOffset = 1000 - poolPositions[poolIndex][last];
-              offset = (textIsRtl && !isVertical ? 100 : 0) + (offset / handlesInPool) - lastOffset;
-              tooltips[handleNumber].innerHTML = poolValues[poolIndex].join(separator);
-              tooltips[handleNumber].style.display = 'block';
-              tooltips[handleNumber].style[direction] = offset + '%';
-            } else {
-              tooltips[handleNumber].style.display = 'none';
-            }
-          }
-        });
-      });
-    }
-
-    mergeTooltips(multiSlider, 15, ' | ');
-
     const valuesDiv = document.getElementById('values');
-
     const updateValues = () => {
       const multiValues = multiSlider.noUiSlider.get().map(Number);
       const extValue = Number(extremitySlider.noUiSlider.get());
@@ -175,7 +146,6 @@
 
     multiSlider.noUiSlider.on('update', updateValues);
     extremitySlider.noUiSlider.on('update', updateValues);
-
     updateValues();
 
     const convoIdInput = document.getElementById('conversationId');
@@ -183,8 +153,10 @@
     const dataLinks = document.getElementById('dataLinks');
     const commentsUrl = document.getElementById('commentsUrl');
     const pcaUrl = document.getElementById('pcaUrl');
-    const dataInput = document.getElementById('dataInput');
+    const commentsInput = document.getElementById('commentsInput');
+    const pcaInput = document.getElementById('pcaInput');
     const useDataBtn = document.getElementById('useData');
+    const commentsTableContainer = document.getElementById('commentsTableContainer');
     const dataSection = document.getElementById('dataSection');
 
     loadDataBtn.addEventListener('click', () => {
@@ -198,11 +170,32 @@
     });
 
     useDataBtn.addEventListener('click', () => {
-      if (!dataInput.value.trim()) return alert('Please paste JSON data first.');
+      if (!commentsInput.value.trim() || !pcaInput.value.trim()) return alert('Please paste both JSON data.');
       try {
-        const parsed = JSON.parse(dataInput.value);
-        console.log('Loaded Polis data sample:', parsed);
+        const comments = JSON.parse(commentsInput.value);
+        const pca = JSON.parse(pcaInput.value);
         dataSection.open = false;
+
+        // Populate comments table
+        let html = '<table><thead><tr><th>ID</th><th>Text</th><th>Agree</th><th>Disagree</th><th>Pass</th></tr></thead><tbody>';
+        comments.forEach(c => {
+          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>
+            <td>${c.tid}</td><td>${c.txt}</td><td>${c.agree_count}</td><td>${c.disagree_count}</td><td>${c.pass_count}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        commentsTableContainer.innerHTML = html;
+
+        // Add row click handlers
+        commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row => {
+          row.addEventListener('click', () => {
+            const agree = Number(row.dataset.agree);
+            const disagree = Number(row.dataset.disagree);
+            const pass = Number(row.dataset.pass);
+            multiSlider.noUiSlider.set([agree, agree + pass, 100 - disagree]);
+          });
+        });
+
       } catch (e) {
         alert('Invalid JSON.');
       }
