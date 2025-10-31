@@ -2,81 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Polis Metric Playground</title>
   <link href="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.css" rel="stylesheet">
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 2em;
-      background: #fafafa;
-    }
-    details {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 1em;
-      border-radius: 6px;
-      margin-bottom: 1.5em;
-    }
-    .links {
-      display: flex;
-      gap: 1em;
-    }
-    .slider-wrapper {
-      margin-bottom: 2em;
-    }
-    #multiSlider, #extremitySlider {
-      margin-top: 1em;
-    }
-    .output {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 1em;
-      border-radius: 6px;
-    }
-    textarea {
-      width: 48%;
-      min-height: 100px;
-      margin-top: 0.5em;
-    }
-    .textarea-container {
-      display: flex;
-      gap: 1em;
-    }
-    .comments-table {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid #ccc;
-      margin-top: 1em;
-    }
-    .comments-table table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .comments-table th, .comments-table td {
-      border: 1px solid #ddd;
-      padding: 4px 8px;
-    }
-    .comments-table tr:hover {
-      background: #f0f0f0;
-      cursor: pointer;
-    }
-    button {
-      margin-top: 0.5em;
-      padding: 0.5em 1em;
-      cursor: pointer;
-    }
+    body { font‑family: sans‑serif; padding: 2em; background: #fafafa; }
+    details { background: #fff; border: 1px solid #ccc; padding: 1em; border‑radius: 6px; margin‑bottom: 1.5em; }
+    .links { display: flex; gap: 1em; }
+    .slider-wrapper { margin‑bottom: 2em; }
+    #multiSlider, #extremitySlider { margin‑top: 1em; }
+    .output { background: #fff; border: 1px solid #ccc; padding: 1em; border‑radius: 6px; }
+    textarea { width: 48%; min‑height: 100px; margin‑top: 0.5em; }
+    .textarea-container { display: flex; gap:1em; }
+    .comments-table { max-height:200px; overflow-y:auto; border:1px solid #ccc; margin‑top:1em; }
+    .comments-table table { width:100%; border-collapse: collapse; }
+    .comments‑table th, .comments‑table td { border:1px solid #ddd; padding:4px 8px; }
+    .comments‑table tr:hover { background:#f0f0f0; cursor:pointer; }
+    button { margin‑top:0.5em; padding:0.5em 1em; cursor:pointer; }
+    .c‑agree { background: green; }
+    .c‑pass { background: yellow; }
+    .c‑disagree { background: red; }
+    .c‑empty { background: white; }
   </style>
 </head>
 <body>
   <h1>Polis Metric Playground</h1>
-  <p>Experiment with sliders to see how values affect the Polis importance and priority metrics. Values persist locally between refreshes.</p>
+  <p>Experiment with sliders to see how values affect the Polis importance and priority metrics. Data fields persist between refreshes.</p>
 
   <details id="dataSection" open>
     <summary><strong>Load Polis Data</strong></summary>
     <label for="conversationId">Conversation ID:</label><br>
-    <input type="text" id="conversationId" placeholder="e.g. 6bkf4ujff9" style="width:200px;" /><br>
-
+    <input type="text" id="conversationId" placeholder="e.g. 6bkf4ujff9" style="width:200px;"><br>
     <button id="loadData">Generate URLs</button>
 
     <div id="dataLinks" style="display:none; margin-top:1em;">
@@ -85,8 +41,8 @@
         <a id="pcaUrl" href="#" target="_blank" rel="noreferrer noopener">PCA2 JSON</a>
       </div>
       <div class="textarea-container">
-        <textarea id="commentsInput" placeholder="Paste comments JSON here..."></textarea>
-        <textarea id="pcaInput" placeholder="Paste PCA2 JSON here..."></textarea>
+        <textarea id="commentsInput" placeholder="Paste comments JSON here…"></textarea>
+        <textarea id="pcaInput" placeholder="Paste PCA2 JSON here…"></textarea>
       </div>
       <button id="useData">Use Data</button>
       <div class="comments-table" id="commentsTableContainer"></div>
@@ -94,7 +50,7 @@
   </details>
 
   <div class="slider-wrapper">
-    <label>Response Distribution (green=agree, red=disagree, yellow=pass, white=remaining)</label>
+    <label>Response Distribution (green = agree, yellow = pass, red = disagree, white = remaining)</label>
     <div id="multiSlider"></div>
   </div>
 
@@ -113,35 +69,69 @@
     const multiSlider = document.getElementById('multiSlider');
     const extremitySlider = document.getElementById('extremitySlider');
 
-    const savedMulti = JSON.parse(localStorage.getItem('multiSliderValues')) || [20, 50, 80];
-    const savedExt = JSON.parse(localStorage.getItem('extremityValue')) || 50;
+    const savedConvoId = localStorage.getItem('conversationId') || '';
+    const savedComments = localStorage.getItem('commentsJSON') || '';
+    const savedPCA = localStorage.getItem('pcaJSON') || '';
 
+    document.getElementById('conversationId').value = savedConvoId;
+    document.getElementById('commentsInput').value = savedComments;
+    document.getElementById('pcaInput').value = savedPCA;
+
+    // Configure 4 handles: 0, agree, agree+pass, total – which gives 3 connecting segments
     noUiSlider.create(multiSlider, {
-      start: savedMulti,
-      connect: [false, true, true, false],
-      tooltips: [true, true, true],
-      range: { 'min': 0, 'max': 100 },
-      step: 1,
-      pips: {
-        mode: 'values',
-        values: [0, 100],
-        density: 100
+      start: [0, 20, 70, 100],
+      connect: [false, true, true, true, false], // must have length = handles + 1 = 5
+      tooltips: [true, true, true, true],
+      range: { min: 0, max: 100 },
+      step: 1
+    });
+
+    const updateConnectColors = () => {
+      const connectElems = multiSlider.querySelectorAll('.noUi-connect');
+      // With 5 connect booleans, there will be 5‑1=4 connects
+      if (connectElems.length === 4) {
+        connectElems[0].className = 'noUi-connect c-empty';      // between min and first handle
+        connectElems[1].className = 'noUi-connect c-agree';
+        connectElems[2].className = 'noUi-connect c-pass';
+        connectElems[3].className = 'noUi-connect c-disagree';
       }
+    };
+
+    updateConnectColors();
+
+    multiSlider.noUiSlider.on('update', (values) => {
+      const v = values.map(Number);
+      // differences for segments (skip the first segment maybe)
+      const diffs = [
+        v[1] - v[0],
+        v[2] - v[1],
+        v[3] - v[2]
+      ];
+      const tooltips = multiSlider.noUiSlider.getTooltips();
+      // Skip first handle tooltip or use a dummy
+      tooltips.forEach((tooltip, i) => {
+        if (tooltip) {
+          if (i === 0) {
+            tooltip.innerHTML = '';          // no meaningful value for handle[0]
+          } else {
+            tooltip.innerHTML = diffs[i-1].toFixed(1);
+          }
+        }
+      });
+      updateConnectColors();
     });
 
     noUiSlider.create(extremitySlider, {
-      start: [savedExt],
+      start: [50],
       tooltips: [true],
-      range: { 'min': 0, 'max': 100 }
+      range: { min: 0, max: 100 }
     });
 
     const valuesDiv = document.getElementById('values');
     const updateValues = () => {
-      const multiValues = multiSlider.noUiSlider.get().map(Number);
-      const extValue = Number(extremitySlider.noUiSlider.get());
-      localStorage.setItem('multiSliderValues', JSON.stringify(multiValues));
-      localStorage.setItem('extremityValue', JSON.stringify(extValue));
-      valuesDiv.textContent = `Handles: ${multiValues.map(v => v.toFixed(1)).join(', ')} | Extremity: ${extValue.toFixed(1)}`;
+      const multiVals = multiSlider.noUiSlider.get().map(Number);
+      const extVal = Number(extremitySlider.noUiSlider.get());
+      valuesDiv.textContent = `Handles: ${multiVals.map(v => v.toFixed(1)).join(', ')} | Extremity: ${extVal.toFixed(1)}`;
     };
 
     multiSlider.noUiSlider.on('update', updateValues);
@@ -162,6 +152,7 @@
     loadDataBtn.addEventListener('click', () => {
       const id = convoIdInput.value.trim();
       if (!id) return alert('Please enter a conversation ID.');
+      localStorage.setItem('conversationId', id);
       const commentsLink = `https://pol.is/api/v3/comments?conversation_id=${id}&moderation=true&include_voting_patterns=true`;
       const pcaLink = `https://pol.is/api/v3/math/pca2?conversation_id=${id}`;
       commentsUrl.href = commentsLink;
@@ -170,34 +161,36 @@
     });
 
     useDataBtn.addEventListener('click', () => {
-      if (!commentsInput.value.trim() || !pcaInput.value.trim()) return alert('Please paste both JSON data.');
+      if (!commentsInput.value.trim() || !pcaInput.value.trim()) {
+        return alert('Please paste both JSON data.');
+      }
       try {
+        localStorage.setItem('commentsJSON', commentsInput.value);
+        localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
-        const pca = JSON.parse(pcaInput.value);
         dataSection.open = false;
 
-        // Populate comments table
         let html = '<table><thead><tr><th>ID</th><th>Text</th><th>Agree</th><th>Disagree</th><th>Pass</th></tr></thead><tbody>';
         comments.forEach(c => {
-          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>
-            <td>${c.tid}</td><td>${c.txt}</td><td>${c.agree_count}</td><td>${c.disagree_count}</td><td>${c.pass_count}</td>
-          </tr>`;
+          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>` +
+                  `<td>${c.tid}</td><td>${c.txt}</td><td>${c.agree_count}</td><td>${c.disagree_count}</td><td>${c.pass_count}</td></tr>`;
         });
         html += '</tbody></table>';
         commentsTableContainer.innerHTML = html;
 
-        // Add row click handlers
         commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row => {
           row.addEventListener('click', () => {
             const agree = Number(row.dataset.agree);
             const disagree = Number(row.dataset.disagree);
             const pass = Number(row.dataset.pass);
-            multiSlider.noUiSlider.set([agree, agree + pass, 100 - disagree]);
+            const total = agree + disagree + pass;
+            // Set slider: 0, agree, agree+pass, total (or 100) depending on total
+            multiSlider.noUiSlider.set([0, agree, agree + pass, 100]);
           });
         });
 
-      } catch (e) {
-        alert('Invalid JSON.');
+      } catch(e) {
+        alert('Invalid JSON data');
       }
     });
   </script>
