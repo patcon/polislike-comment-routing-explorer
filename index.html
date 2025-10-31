@@ -52,6 +52,64 @@
     .noUi-connect.c-disagree{background:var(--disagree) !important}
 
     footer{margin-top:18px; color:var(--muted); font-size:13px}
+
+    /* Statement Cards Styles */
+    .statement-cards{display:flex; flex-direction:column; gap:12px}
+    .statement-card{
+      background:var(--card);
+      border:1px solid #e6e9ef;
+      border-radius:var(--radius);
+      padding:16px;
+      position:relative;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .statement-card:hover{
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px rgba(11, 95, 255, 0.1);
+    }
+    .statement-card-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      margin-bottom:8px;
+    }
+    .statement-id{
+      font-size:12px;
+      color:var(--muted);
+      background:#f8fafc;
+      padding:2px 6px;
+      border-radius:4px;
+      font-weight:500;
+    }
+    .statement-priority{
+      font-size:11px;
+      color:var(--muted);
+      background:#f0f9ff;
+      padding:2px 6px;
+      border-radius:4px;
+    }
+    .statement-text{
+      font-size:15px;
+      line-height:1.4;
+      color:#0f172a;
+      margin-bottom:8px;
+    }
+    .statement-stats{
+      display:flex;
+      gap:12px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .stat-item{
+      display:flex;
+      align-items:center;
+      gap:4px;
+    }
+    .stat-agree{color:var(--agree)}
+    .stat-disagree{color:var(--disagree)}
+    .stat-pass{color:var(--pass)}
+
     @media (max-width:880px){ .row{flex-direction:column} .col.small{flex:1} .textarea-container{flex-direction:column} }
   </style>
 </head>
@@ -129,6 +187,22 @@
       <div class="output">
         <strong>Values:</strong>
         <div id="values"></div>
+      </div>
+    </div>
+
+    <!-- Statement Selection Section -->
+    <div class="controls" style="margin-top: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px;">Statement Selection (Polis-style)</h3>
+        <button id="refreshStatements" class="btn" disabled>Refresh Selection</button>
+      </div>
+      <p style="color: var(--muted); font-size: 13px; margin: 0 0 16px 0;">
+        All statements are displayed in weighted random order based on their priorities. Only non-moderated statements (moderation ≠ -1) are included. Click "Refresh Selection" to re-randomize the order.
+      </p>
+      <div id="statementCards" class="statement-cards">
+        <div style="color: var(--muted); text-align: center; padding: 40px;">
+          Load data first to see statement selection
+        </div>
       </div>
     </div>
 
@@ -467,6 +541,178 @@
         });
       } catch (e) {
         alert('Invalid JSON data: ' + e.message);
+      }
+    });
+
+    // --- STATEMENT SELECTION FUNCTIONALITY ---
+    let commentsData = null;
+    const refreshStatementsBtn = document.getElementById('refreshStatements');
+    const statementCardsContainer = document.getElementById('statementCards');
+
+    // Weighted random selection function - now returns all statements in weighted random order
+    function weightedRandomSelection(items, weights) {
+      if (items.length === 0) return [];
+
+      const selected = [];
+      const availableItems = [...items];
+      const availableWeights = [...weights];
+
+      // Select all items in weighted random order
+      while (availableItems.length > 0) {
+        const totalWeight = availableWeights.reduce((sum, weight) => sum + weight, 0);
+        if (totalWeight === 0) {
+          // If no weights left, just add remaining items in order
+          selected.push(...availableItems);
+          break;
+        }
+
+        let random = Math.random() * totalWeight;
+        let selectedIndex = 0;
+
+        for (let j = 0; j < availableWeights.length; j++) {
+          random -= availableWeights[j];
+          if (random <= 0) {
+            selectedIndex = j;
+            break;
+          }
+        }
+
+        selected.push(availableItems[selectedIndex]);
+        availableItems.splice(selectedIndex, 1);
+        availableWeights.splice(selectedIndex, 1);
+      }
+
+      return selected;
+    }
+
+    // Generate statement cards
+    function generateStatementCards() {
+      if (!commentsData || !pcaData || !pcaData['comment-priorities']) {
+        statementCardsContainer.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 40px;">No data available for statement selection</div>';
+        return;
+      }
+
+      // Filter out moderated statements (mod === -1)
+      const activeStatements = commentsData.filter(comment => comment.mod !== -1);
+
+      if (activeStatements.length === 0) {
+        statementCardsContainer.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 40px;">No active statements available</div>';
+        return;
+      }
+
+      // Get priorities for active statements
+      const statementsWithPriorities = activeStatements.map(comment => {
+        const priority = pcaData['comment-priorities'][comment.tid.toString()] || 0;
+        return { comment, priority };
+      }).filter(item => item.priority > 0);
+
+      if (statementsWithPriorities.length === 0) {
+        statementCardsContainer.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 40px;">No statements with priorities available</div>';
+        return;
+      }
+
+      // Perform weighted random selection for ALL statements
+      const statements = statementsWithPriorities.map(item => item.comment);
+      const priorities = statementsWithPriorities.map(item => item.priority);
+      const selectedStatements = weightedRandomSelection(statements, priorities);
+
+      // Generate HTML for ALL selected statements
+      let html = '';
+      selectedStatements.forEach(comment => {
+        const priority = pcaData['comment-priorities'][comment.tid.toString()];
+        const text = String(comment.txt || '').trim();
+
+        html += `
+          <div class="statement-card" data-tid="${comment.tid}">
+            <div class="statement-card-header">
+              <span class="statement-id">ID: ${comment.tid}</span>
+              <span class="statement-priority">Priority: ${priority.toFixed(2)}</span>
+            </div>
+            <div class="statement-text">${text}</div>
+            <div class="statement-stats">
+              <div class="stat-item stat-agree">
+                <span>👍</span>
+                <span>${comment.agree_count || 0}</span>
+              </div>
+              <div class="stat-item stat-pass">
+                <span>➖</span>
+                <span>${comment.pass_count || 0}</span>
+              </div>
+              <div class="stat-item stat-disagree">
+                <span>👎</span>
+                <span>${comment.disagree_count || 0}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      statementCardsContainer.innerHTML = html;
+
+      // Add click handlers to statement cards
+      statementCardsContainer.querySelectorAll('.statement-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const tid = card.dataset.tid;
+          const comment = selectedStatements.find(c => c.tid.toString() === tid);
+          if (comment) {
+            // Update sliders with this statement's data
+            updateTooltipsRawCounts(comment.agree_count || 0, comment.pass_count || 0, comment.disagree_count || 0);
+
+            // Set extremity if available
+            if (pcaData && pcaData.pca && pcaData.pca['comment-extremity'] && pcaData['comment-priorities']) {
+              const extremityArray = pcaData.pca['comment-extremity'];
+              const priorityKeys = Object.keys(pcaData['comment-priorities']).sort((a, b) => parseInt(a) - parseInt(b));
+              const keyIndex = priorityKeys.indexOf(tid);
+              if (keyIndex >= 0 && keyIndex < extremityArray.length && extremityArray[keyIndex] !== null) {
+                extremitySlider.noUiSlider.set(extremityArray[keyIndex]);
+              }
+            }
+
+            // Set moderation status
+            const radioButtons = document.querySelectorAll('input[name="moderationStatus"]');
+            const moderationValue = (comment.mod !== undefined && comment.mod !== null ? comment.mod : '0').toString();
+            radioButtons.forEach(radio => {
+              radio.checked = radio.value === moderationValue;
+            });
+
+            // Set meta status
+            const metaStatusInput = document.getElementById('metaStatus');
+            if (metaStatusInput) {
+              metaStatusInput.checked = comment.is_meta || false;
+            }
+
+            // Scroll to controls
+            document.querySelector('.controls').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+    }
+
+    // Refresh button handler
+    refreshStatementsBtn.addEventListener('click', generateStatementCards);
+
+    // Modify the existing useData event listener to also handle statement generation
+    const originalUseDataClick = useDataBtn.onclick;
+    useDataBtn.addEventListener('click', async (e) => {
+      // Let the original handler run first, but we need to capture the comments data
+      if (!commentsInput.value.trim()) return;
+
+      try {
+        const comments = JSON.parse(commentsInput.value);
+        commentsData = comments; // Store for statement selection
+
+        // Enable refresh button once data is loaded
+        refreshStatementsBtn.disabled = false;
+
+        // Generate initial statement cards after a short delay to ensure PCA data is processed
+        setTimeout(() => {
+          if (pcaData && pcaData['comment-priorities']) {
+            generateStatementCards();
+          }
+        }, 100);
+
+      } catch (e) {
+        console.error('Error parsing comments data for statement selection:', e);
       }
     });
   </script>
