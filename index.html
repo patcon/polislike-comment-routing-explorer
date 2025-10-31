@@ -64,8 +64,8 @@
       <summary><strong>Load Polis Data</strong></summary>
       <div style="margin-top:12px" class="row">
         <div class="col small">
-          <label for="conversationId">Conversation ID</label>
-          <input id="conversationId" type="text" placeholder="e.g. 6bkf4ujff9">
+          <label for="conversation">Conversation (ID or URL)</label>
+          <input id="conversation" type="text" placeholder="e.g. 6bkf4ujff9 or https://pol.is/6bkf4ujff9">
           <div style="height:8px"></div>
           <button id="loadData" class="btn">Generate URLs</button>
           <div class="links" id="linkRow" style="display:none">
@@ -139,7 +139,7 @@
   <script>
     const multiSlider = document.getElementById('multiSlider');
     const extremitySlider = document.getElementById('extremitySlider');
-    const convoIdInput = document.getElementById('conversationId');
+    const convoIdInput = document.getElementById('conversation');
     const commentsInput = document.getElementById('commentsInput');
     const pcaInput = document.getElementById('pcaInput');
     const loadDataBtn = document.getElementById('loadData');
@@ -152,7 +152,7 @@
     let pcaData = null; // store PCA data globally to access comment-extremity
 
     // --- RESTORE SAVED INPUTS ---
-    convoIdInput.value = localStorage.getItem('conversationId') || '';
+    convoIdInput.value = localStorage.getItem('conversation') || '';
     commentsInput.value = localStorage.getItem('commentsJSON') || '';
     pcaInput.value = localStorage.getItem('pcaJSON') || '';
 
@@ -311,9 +311,20 @@
 
     // --- LINKS AND TABLE ---
     loadDataBtn.addEventListener('click', () => {
-      const id = convoIdInput.value.trim();
-      if (!id) return alert('Enter conversation ID');
-      localStorage.setItem('conversationId', id);
+      const input = convoIdInput.value.trim();
+      if (!input) return alert('Enter conversation ID or URL');
+
+      // Extract conversation ID from URL if it's a URL, otherwise use as-is
+      let id = input;
+      if (input.includes('pol.is/')) {
+        // Extract ID from URL like https://pol.is/6bkf4ujff9 or pol.is/6bkf4ujff9
+        const match = input.match(/pol\.is\/([a-zA-Z0-9]+)/);
+        if (match) {
+          id = match[1];
+        }
+      }
+
+      localStorage.setItem('conversation', input);
       const commentsLink = `https://pol.is/api/v3/comments?conversation_id=${id}&moderation=true&include_voting_patterns=true`;
       const pcaLink = `https://pol.is/api/v3/math/pca2?conversation_id=${id}`;
       document.getElementById('commentsUrl').href = commentsLink;
