@@ -95,8 +95,35 @@
       </div>
 
       <div class="slider-wrapper">
-        <label>Extremity Weight</label>
+        <label>Extremity</label>
         <div id="extremitySlider" style="margin-top:10px"></div>
+      </div>
+
+      <div class="slider-wrapper">
+        <div class="row">
+          <div class="col">
+            <label>Moderation Status</label>
+            <div style="margin-top:6px;">
+              <label style="display:inline-block; margin-right:12px; font-weight:normal;">
+                <input type="radio" name="moderationStatus" value="1" style="margin-right:4px;"> Moderated In
+              </label>
+              <label style="display:inline-block; margin-right:12px; font-weight:normal;">
+                <input type="radio" name="moderationStatus" value="-1" style="margin-right:4px;"> Moderated Out
+              </label>
+              <label style="display:inline-block; font-weight:normal;">
+                <input type="radio" name="moderationStatus" value="0" style="margin-right:4px;"> Unmoderated
+              </label>
+            </div>
+          </div>
+          <div class="col">
+            <label>Meta Status</label>
+            <div style="margin-top:6px;">
+              <label style="font-weight:normal;">
+                <input id="metaStatus" type="checkbox" style="margin-right:4px;"> This is a metadata statement
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="output">
@@ -321,8 +348,8 @@
           }
         }
 
-        // --- table header reordered: agree, pass, disagree, extremity, comment-priorities ---
-        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th><th class="small">Extremity</th><th class="small">Priority</th></tr></thead><tbody>';
+        // --- table header reordered: agree, pass, disagree, extremity, comment-priorities, moderation status, meta ---
+        let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th><th class="small">Extremity</th><th class="small">Priority</th><th class="small">Moderation Status</th><th class="small">Meta</th></tr></thead><tbody>';
 
         // Sort comments by statement ID (tid) before displaying
         const sortedComments = comments.sort((a, b) => {
@@ -354,6 +381,13 @@
             }
           }
 
+          // Get moderation status (show 0 if undefined/null, otherwise show the actual value)
+          const moderationStatus = c.mod !== undefined && c.mod !== null ? c.mod : '0';
+
+          // Get is_meta status and create checkbox
+          const isMeta = c.is_meta || false;
+          const metaCheckbox = isMeta ? '<input type="checkbox" checked disabled>' : '<input type="checkbox" disabled>';
+
           html += `<tr data-agree='${c.agree_count}' data-pass='${c.pass_count}' data-disagree='${c.disagree_count}'>` +
                   `<td>${c.tid}</td>` +
                   `<td>${text}</td>` +
@@ -362,6 +396,8 @@
                   `<td class="small">${c.disagree_count}</td>` +
                   `<td class="small">${extremityValue}</td>` +
                   `<td class="small">${commentPriority}</td>` +
+                  `<td class="small">${moderationStatus}</td>` +
+                  `<td class="small">${metaCheckbox}</td>` +
                   `</tr>`;
         });
 
@@ -386,6 +422,27 @@
                 extremitySlider.noUiSlider.set(extremityValue);
                 console.log(`Set extremity for statement ${id} to ${extremityValue}`);
               }
+            }
+
+            // Populate moderation status and meta fields
+            const cells = row.querySelectorAll('td');
+            const moderationStatusCell = cells[7]; // 8th column (0-indexed)
+            const metaCell = cells[8]; // 9th column (0-indexed)
+
+            // Set moderation status radio buttons
+            if (moderationStatusCell) {
+              const moderationValue = moderationStatusCell.textContent.trim();
+              const radioButtons = document.querySelectorAll('input[name="moderationStatus"]');
+              radioButtons.forEach(radio => {
+                radio.checked = radio.value === moderationValue;
+              });
+            }
+
+            // Set meta status field
+            const metaStatusInput = document.getElementById('metaStatus');
+            if (metaStatusInput && metaCell) {
+              const checkbox = metaCell.querySelector('input[type="checkbox"]');
+              metaStatusInput.checked = checkbox ? checkbox.checked : false;
             }
           });
         });
