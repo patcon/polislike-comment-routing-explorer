@@ -247,7 +247,7 @@
 
     function updateValues() {
       const multi = multiSlider.noUiSlider.get().map(Number);
-      const ext = Number(extremitySlider.noUiSlider.get()) / 100; // normalize extremity 0–1
+      const ext = Number(extremitySlider.noUiSlider.get()); // use extremity value directly
 
       // interpret slider sections (agree, pass, disagree, unseen)
       const agreePct = multi[0];
