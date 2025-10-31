@@ -364,10 +364,14 @@
 
           // Get extremity value if available
           let extremityValue = '';
-          if (pcaData && pcaData.pca && pcaData.pca['comment-extremity']) {
+          if (pcaData && pcaData.pca && pcaData.pca['comment-extremity'] && pcaData['comment-priorities']) {
             const extremityArray = pcaData.pca['comment-extremity'];
-            if (statementId >= 0 && statementId < extremityArray.length && extremityArray[statementId] !== null && extremityArray[statementId] !== undefined) {
-              extremityValue = extremityArray[statementId].toFixed(2);
+            const priorityKeys = Object.keys(pcaData['comment-priorities']).sort((a, b) => parseInt(a) - parseInt(b));
+
+            // Find the index of this statement ID in the sorted priority keys
+            const keyIndex = priorityKeys.indexOf(statementId.toString());
+            if (keyIndex >= 0 && keyIndex < extremityArray.length && extremityArray[keyIndex] !== null && extremityArray[keyIndex] !== undefined) {
+              extremityValue = extremityArray[keyIndex].toFixed(2);
             }
           }
 
@@ -375,6 +379,7 @@
           let commentPriority = '';
           if (pcaData && pcaData['comment-priorities']) {
             const priorityObject = pcaData['comment-priorities'];
+            // Use the same key format as comment-extremity (statement ID as key)
             const priorityValue = priorityObject[statementId.toString()];
             if (priorityValue !== null && priorityValue !== undefined) {
               commentPriority = priorityValue.toFixed(2);
@@ -414,13 +419,16 @@
 
             // Set extremity slider based on statement ID if PCA data is available
             const statementId = row.querySelector('td:first-child').textContent;
-            if (pcaData && pcaData.pca && pcaData.pca['comment-extremity']) {
+            if (pcaData && pcaData.pca && pcaData.pca['comment-extremity'] && pcaData['comment-priorities']) {
               const extremityArray = pcaData.pca['comment-extremity'];
-              const id = parseInt(statementId);
-              if (id >= 0 && id < extremityArray.length && extremityArray[id] !== null && extremityArray[id] !== undefined) {
-                const extremityValue = extremityArray[id];
+              const priorityKeys = Object.keys(pcaData['comment-priorities']).sort((a, b) => parseInt(a) - parseInt(b));
+
+              // Find the index of this statement ID in the sorted priority keys
+              const keyIndex = priorityKeys.indexOf(statementId.toString());
+              if (keyIndex >= 0 && keyIndex < extremityArray.length && extremityArray[keyIndex] !== null && extremityArray[keyIndex] !== undefined) {
+                const extremityValue = extremityArray[keyIndex];
                 extremitySlider.noUiSlider.set(extremityValue);
-                console.log(`Set extremity for statement ${id} to ${extremityValue}`);
+                console.log(`Set extremity for statement ${statementId} to ${extremityValue} (index ${keyIndex})`);
               }
             }
 
