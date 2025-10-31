@@ -120,58 +120,76 @@
     const commentsTableContainer = document.getElementById('commentsTableContainer');
     const linkRow = document.getElementById('linkRow');
 
-    // restore saved inputs (only conversation and pasted JSON)
+    // --- RESTORE SAVED INPUTS ---
     convoIdInput.value = localStorage.getItem('conversationId') || '';
     commentsInput.value = localStorage.getItem('commentsJSON') || '';
     pcaInput.value = localStorage.getItem('pcaJSON') || '';
 
-    // create slider: 4 handles -> connect array length = handles + 1 = 5
+    // --- INITIAL MULTISLIDER SETUP ---
     noUiSlider.create(multiSlider, {
-      start: [0, 20, 70, 100],
-      connect: [false, true, true, true, false],
-      tooltips: [true, true, true, true],
+      start: [33, 66, 100],
+      connect: [true, true, true, true], // 3 handles + 4 connects
       range: { min: 0, max: 100 },
-      step: 1
+      behaviour: 'none',
+      tooltips: [
+        { to: v => Math.round(v), from: Number },
+        { to: v => Math.round(v), from: Number },
+        { to: v => Math.round(v), from: Number }
+      ]
     });
 
-    function updateConnectColors(){
-      const connects = multiSlider.querySelectorAll('.noUi-connect');
-      if(connects.length === 4){
-        connects[0].className = 'noUi-connect c-empty';
-        connects[1].className = 'noUi-connect c-agree';
-        connects[2].className = 'noUi-connect c-pass';
-        connects[3].className = 'noUi-connect c-disagree';
-      }
+    // color segments
+    const connectColors = ['#4CAF50', '#FFEB3B', '#F44336', '#FFFFFF']; // agree, pass, disagree, remainder
+    function updateConnectColors() {
+      multiSlider.querySelectorAll('.noUi-connect').forEach((el, i) => {
+        el.style.background = connectColors[i] || '#ccc';
+      });
     }
     updateConnectColors();
 
-    // show diffs in handle tooltips (handle0 is empty)
-    multiSlider.noUiSlider.on('update', (values) => {
-      const v = values.map(Number);
-      const diffs = [v[1]-v[0], v[2]-v[1], v[3]-v[2]];
-      const tooltips = multiSlider.noUiSlider.getTooltips();
-      tooltips.forEach((t,i)=>{
-        if(!t) return;
-        if(i===0) { t.innerHTML = ''; } else { t.innerHTML = diffs[i-1].toFixed(0); }
-      });
+    // --- UPDATE TOOLTIP VALUES (raw counts) ---
+    function updateTooltipsRawCounts(agree, pass, disagree) {
+      const total = agree + pass + disagree;
+      if (total === 0) return;
+      const agreePct = (agree / total) * 100;
+      const passPct = (pass / total) * 100;
+      const disagreePct = (disagree / total) * 100;
+
+      const v1 = agreePct;
+      const v2 = agreePct + passPct;
+      const v3 = agreePct + passPct + disagreePct;
+
+      multiSlider.noUiSlider.set([v1, v2, v3]);
+      const tips = multiSlider.querySelectorAll('.noUi-tooltip');
+      if (tips.length >= 3) {
+        tips[0].innerHTML = agree;
+        tips[1].innerHTML = pass;
+        tips[2].innerHTML = disagree;
+      }
       updateConnectColors();
+    }
+
+    // --- SECONDARY SLIDER (EXTREMITY) ---
+    noUiSlider.create(extremitySlider, { 
+      start: [50], 
+      tooltips: [true], 
+      range: { min: 0, max: 100 } 
     });
 
-    noUiSlider.create(extremitySlider, { start: [50], tooltips: [true], range: { min: 0, max: 100 } });
-
-    function updateValues(){
+    function updateValues() {
       const multi = multiSlider.noUiSlider.get().map(Number);
       const ext = Number(extremitySlider.noUiSlider.get());
-      document.getElementById('values').textContent = `Handles: ${multi.map(v=>v.toFixed(0)).join(', ')} | Extremity: ${ext.toFixed(0)}`;
+      document.getElementById('values').textContent =
+        `Handles: ${multi.map(v => v.toFixed(0)).join(', ')} | Extremity: ${ext.toFixed(0)}`;
     }
     multiSlider.noUiSlider.on('update', updateValues);
     extremitySlider.noUiSlider.on('update', updateValues);
     updateValues();
 
-    // load data links
-    loadDataBtn.addEventListener('click', ()=>{
+    // --- LINKS AND TABLE ---
+    loadDataBtn.addEventListener('click', () => {
       const id = convoIdInput.value.trim();
-      if(!id) return alert('enter conversation id');
+      if (!id) return alert('Enter conversation ID');
       localStorage.setItem('conversationId', id);
       const commentsLink = `https://pol.is/api/v3/comments?conversation_id=${id}&moderation=true&include_voting_patterns=true`;
       const pcaLink = `https://pol.is/api/v3/math/pca2?conversation_id=${id}`;
@@ -180,42 +198,31 @@
       linkRow.style.display = 'flex';
     });
 
-    // Use pasted data and populate table (table visible outside details)
-    useDataBtn.addEventListener('click', ()=>{
-      if(!commentsInput.value.trim()) return alert('paste comments JSON');
-      try{
+    useDataBtn.addEventListener('click', () => {
+      if (!commentsInput.value.trim()) return alert('Paste comments JSON');
+      try {
         localStorage.setItem('commentsJSON', commentsInput.value);
         localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
-        // build compact table
         let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Disagree</th><th class="small">Pass</th></tr></thead><tbody>';
-        comments.forEach(c=>{
-          const text = String(c.txt||'').replace(/\n/g,' ').slice(0,120);
-          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>`+
+        comments.forEach(c => {
+          const text = String(c.txt || '').replace(/[\r\n]+/g, ' ').slice(0, 120);
+          html += `<tr data-agree='${c.agree_count}' data-disagree='${c.disagree_count}' data-pass='${c.pass_count}'>` +
                   `<td>${c.tid}</td><td>${text}</td><td class="small">${c.agree_count}</td><td class="small">${c.disagree_count}</td><td class="small">${c.pass_count}</td></tr>`;
         });
         html += '</tbody></table>';
         commentsTableContainer.innerHTML = html;
-        // collapse details
         document.getElementById('dataSection').open = false;
-        // attach click handlers
-        commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row=>{
-          row.addEventListener('click', ()=>{
+
+        commentsTableContainer.querySelectorAll('tr[data-agree]').forEach(row => {
+          row.addEventListener('click', () => {
             const agree = Number(row.dataset.agree);
             const disagree = Number(row.dataset.disagree);
             const pass = Number(row.dataset.pass);
-            // total as percent of 100; if sum==0 show zeros
-            const sum = agree+disagree+pass;
-            if(sum===0){ multiSlider.noUiSlider.set([0,0,0,100]); return; }
-            // scale to 0..100
-            const a = (agree/sum)*100;
-            const p = (pass/sum)*100;
-            const d = (disagree/sum)*100;
-            const v0 = 0, v1 = Math.round(a), v2 = Math.round(a+p), v3 = 100;
-            multiSlider.noUiSlider.set([v0,v1,v2,v3]);
+            updateTooltipsRawCounts(agree, pass, disagree);
           });
         });
-      }catch(e){ alert('Invalid JSON data: '+e.message); }
+      } catch (e) { alert('Invalid JSON data: ' + e.message); }
     });
   </script>
 </body>
