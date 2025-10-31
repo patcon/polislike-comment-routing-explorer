@@ -120,8 +120,9 @@
     const commentsTableContainer = document.getElementById('commentsTableContainer');
     const linkRow = document.getElementById('linkRow');
 
-    // Global variable to store the "n" value from math endpoint
+    // Global variables to store data from math endpoint
     let totalParticipants = 100; // default fallback
+    let pcaData = null; // store PCA data globally to access comment-extremity
 
     // --- RESTORE SAVED INPUTS ---
     convoIdInput.value = localStorage.getItem('conversationId') || '';
@@ -300,16 +301,20 @@
         localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
 
-        // Try to get "n" from PCA data if available
+        // Try to get "n" from PCA data if available and store PCA data globally
         if (pcaInput.value.trim()) {
           try {
-            const pcaData = JSON.parse(pcaInput.value);
+            pcaData = JSON.parse(pcaInput.value);
             if (pcaData.n && typeof pcaData.n === 'number') {
               console.log('Found n value in PCA data:', pcaData.n);
               updateSliderRange(pcaData.n);
             }
+            if (pcaData.pca && pcaData.pca['comment-extremity']) {
+              console.log('Found comment-extremity data:', pcaData.pca['comment-extremity'].length, 'entries');
+            }
           } catch (pcaError) {
-            console.warn('Could not parse PCA data for n value:', pcaError);
+            console.warn('Could not parse PCA data:', pcaError);
+            pcaData = null;
           }
         }
 
@@ -337,6 +342,18 @@
             const pass = Number(row.dataset.pass);
             const disagree = Number(row.dataset.disagree);
             updateTooltipsRawCounts(agree, pass, disagree);
+
+            // Set extremity slider based on statement ID if PCA data is available
+            const statementId = row.querySelector('td:first-child').textContent;
+            if (pcaData && pcaData.pca && pcaData.pca['comment-extremity']) {
+              const extremityArray = pcaData.pca['comment-extremity'];
+              const id = parseInt(statementId);
+              if (id >= 0 && id < extremityArray.length && extremityArray[id] !== null && extremityArray[id] !== undefined) {
+                const extremityValue = extremityArray[id];
+                extremitySlider.noUiSlider.set(extremityValue);
+                console.log(`Set extremity for statement ${id} to ${extremityValue}`);
+              }
+            }
           });
         });
       } catch (e) {
