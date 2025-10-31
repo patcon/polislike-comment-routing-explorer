@@ -176,12 +176,58 @@
       range: { min: 0, max: 100 } 
     });
 
+    function probability(n, total, pseudo = 1) {
+      // Laplace-smoothed probability (n + pseudo) / (total + 3*pseudo)
+      return (n + pseudo) / (total + 3 * pseudo);
+    }
+
+    function importanceMetric(n_agree, n_disagree, n_total, extremity, pseudo = 1) {
+      const n_pass = n_total - (n_agree + n_disagree);
+      const prob_agree = probability(n_agree, n_total, pseudo);
+      const prob_pass = probability(n_pass, n_total, pseudo);
+      const prob_engagement = 1 - prob_pass;
+      const importance = prob_agree * prob_engagement * (1 + extremity);
+      return importance;
+    }
+
+    function priorityMetric(is_meta, n_agree, n_disagree, n_total, extremity, meta_priority = 7, pseudo = 1) {
+      const importance = importanceMetric(n_agree, n_disagree, n_total, extremity, pseudo);
+      const NO_VOTES_SCALE_FACTOR = 9;
+      const newness_scale_factor = 1 + (NO_VOTES_SCALE_FACTOR - 1) * Math.pow(2, -(n_total / 5));
+      let priority = importance * newness_scale_factor;
+      if (is_meta) priority = meta_priority;
+      const boosted_bias_priority = Math.pow(priority, 2);
+      return boosted_bias_priority;
+    }
+
     function updateValues() {
       const multi = multiSlider.noUiSlider.get().map(Number);
-      const ext = Number(extremitySlider.noUiSlider.get());
-      document.getElementById('values').textContent =
-        `Handles: ${multi.map(v => v.toFixed(0)).join(', ')} | Extremity: ${ext.toFixed(0)}`;
+      const ext = Number(extremitySlider.noUiSlider.get()) / 100; // normalize extremity 0–1
+
+      // interpret slider sections (agree, pass, disagree, unseen)
+      const agreePct = multi[0];
+      const passPct = multi[1] - multi[0];
+      const disagreePct = multi[2] - multi[1];
+      const unseenPct = 100 - multi[2];
+      const totalVotes = 100; // use 100 as normalized total for simplicity
+
+      // convert back to counts (relative scale)
+      const n_agree = agreePct;
+      const n_disagree = disagreePct;
+      const n_total = agreePct + disagreePct + passPct;
+
+      // compute metrics
+      const importance = importanceMetric(n_agree, n_disagree, n_total, ext);
+      const priority = priorityMetric(false, n_agree, n_disagree, n_total, ext);
+
+      document.getElementById('values').innerHTML =
+        `<div><strong>Handles:</strong> ${multi.map(v => v.toFixed(0)).join(', ')}<br>` +
+        `<strong>Extremity:</strong> ${ext.toFixed(2)}<br>` +
+        `<strong>Agree:</strong> ${n_agree.toFixed(1)} | <strong>Pass:</strong> ${passPct.toFixed(1)} | <strong>Disagree:</strong> ${n_disagree.toFixed(1)}<br>` +
+        `<strong>Importance:</strong> ${importance.toFixed(4)}<br>` +
+        `<strong>Priority:</strong> ${priority.toFixed(4)}</div>`;
     }
+
     multiSlider.noUiSlider.on('update', updateValues);
     extremitySlider.noUiSlider.on('update', updateValues);
     updateValues();
