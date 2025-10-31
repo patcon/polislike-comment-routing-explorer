@@ -120,6 +120,9 @@
     const commentsTableContainer = document.getElementById('commentsTableContainer');
     const linkRow = document.getElementById('linkRow');
 
+    // Global variable to store the "n" value from math endpoint
+    let totalParticipants = 100; // default fallback
+
     // --- RESTORE SAVED INPUTS ---
     convoIdInput.value = localStorage.getItem('conversationId') || '';
     commentsInput.value = localStorage.getItem('commentsJSON') || '';
@@ -127,15 +130,33 @@
 
     // --- INITIAL MULTISLIDER SETUP ---
     noUiSlider.create(multiSlider, {
-      start: [33, 66, 100],
+      start: [33, 66, totalParticipants],
       connect: [true, true, true, true], // 3 handles + 4 connects
-      range: { min: 0, max: 100 },
+      range: { min: 0, max: totalParticipants },
       behaviour: 'none',
-      tooltips: [
-        { to: v => Math.round(v), from: Number },
-        { to: v => Math.round(v), from: Number },
-        { to: v => Math.round(v), from: Number }
-      ]
+      tooltips: false // Disable built-in tooltips, we'll create custom ones
+    });
+
+    // Create custom tooltip elements
+    const handles = multiSlider.querySelectorAll('.noUi-handle');
+    handles.forEach((handle, index) => {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'custom-tooltip';
+      tooltip.style.cssText = `
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        margin-bottom: 8px;
+        pointer-events: none;
+      `;
+      handle.appendChild(tooltip);
     });
 
     // color segments
@@ -147,26 +168,49 @@
     }
     updateConnectColors();
 
+    // --- UPDATE TOOLTIPS TO SHOW COUNTS ---
+    function updateTooltipCounts() {
+      const values = multiSlider.noUiSlider.get().map(Number);
+      const customTooltips = multiSlider.querySelectorAll('.custom-tooltip');
+      if (customTooltips.length >= 3) {
+        customTooltips[0].innerHTML = Math.round(values[0]); // agree count
+        customTooltips[1].innerHTML = Math.round(values[1] - values[0]); // pass count
+        customTooltips[2].innerHTML = Math.round(values[2] - values[1]); // disagree count
+      }
+    }
+
     // --- UPDATE TOOLTIP VALUES (raw counts) ---
     function updateTooltipsRawCounts(agree, pass, disagree) {
       const total = agree + pass + disagree;
       if (total === 0) return;
-      const agreePct = (agree / total) * 100;
-      const passPct = (pass / total) * 100;
-      const disagreePct = (disagree / total) * 100;
 
-      const v1 = agreePct;
-      const v2 = agreePct + passPct;
-      const v3 = agreePct + passPct + disagreePct;
+      // Set slider values to actual counts
+      const v1 = agree;
+      const v2 = agree + pass;
+      const v3 = agree + pass + disagree;
 
       multiSlider.noUiSlider.set([v1, v2, v3]);
-      const tips = multiSlider.querySelectorAll('.noUi-tooltip');
-      if (tips.length >= 3) {
-        tips[0].innerHTML = agree;
-        tips[1].innerHTML = pass;
-        tips[2].innerHTML = disagree;
-      }
+      updateTooltipCounts();
       updateConnectColors();
+    }
+
+    // --- FUNCTION TO UPDATE SLIDER RANGE ---
+    function updateSliderRange(newMax) {
+      totalParticipants = newMax;
+
+      // Update the range of the multi-slider
+      multiSlider.noUiSlider.updateOptions({
+        range: { min: 0, max: newMax }
+      });
+
+      // Reset to proportional values based on new max
+      const proportionalValues = [
+        Math.round(newMax * 0.33),
+        Math.round(newMax * 0.66),
+        newMax
+      ];
+      multiSlider.noUiSlider.set(proportionalValues);
+      updateTooltipCounts();
     }
 
     // --- SECONDARY SLIDER (EXTREMITY) ---
@@ -208,28 +252,33 @@
       const agreePct = multi[0];
       const passPct = multi[1] - multi[0];
       const disagreePct = multi[2] - multi[1];
-      const unseenPct = 100 - multi[2];
-      const totalVotes = 100; // use 100 as normalized total for simplicity
+      const unseenPct = totalParticipants - multi[2];
 
-      // convert back to counts (relative scale)
+      // convert slider values to actual counts
       const n_agree = agreePct;
       const n_disagree = disagreePct;
-      const n_total = agreePct + disagreePct + passPct;
+      const n_pass = passPct;
+      const n_total = n_agree + n_disagree + n_pass;
 
       // compute metrics
       const importance = importanceMetric(n_agree, n_disagree, n_total, ext);
       const priority = priorityMetric(false, n_agree, n_disagree, n_total, ext);
 
       document.getElementById('values').innerHTML =
-        `<div><strong>Handles:</strong> ${multi.map(v => v.toFixed(0)).join(', ')}<br>` +
+        `<div><strong>Handles:</strong> ${multi.map(v => v.toFixed(0)).join(', ')} (out of ${totalParticipants})<br>` +
         `<strong>Extremity:</strong> ${ext.toFixed(2)}<br>` +
-        `<strong>Agree:</strong> ${n_agree.toFixed(1)} | <strong>Pass:</strong> ${passPct.toFixed(1)} | <strong>Disagree:</strong> ${n_disagree.toFixed(1)}<br>` +
+        `<strong>Agree:</strong> ${n_agree.toFixed(0)} | <strong>Pass:</strong> ${n_pass.toFixed(0)} | <strong>Disagree:</strong> ${n_disagree.toFixed(0)}<br>` +
+        `<strong>Total Votes:</strong> ${n_total.toFixed(0)} | <strong>Unseen:</strong> ${unseenPct.toFixed(0)}<br>` +
         `<strong>Importance:</strong> ${importance.toFixed(4)}<br>` +
         `<strong>Priority:</strong> ${priority.toFixed(4)}</div>`;
     }
 
-    multiSlider.noUiSlider.on('update', updateValues);
+    multiSlider.noUiSlider.on('update', function() {
+      updateTooltipCounts();
+      updateValues();
+    });
     extremitySlider.noUiSlider.on('update', updateValues);
+    updateTooltipCounts();
     updateValues();
 
     // --- LINKS AND TABLE ---
@@ -244,12 +293,25 @@
       linkRow.style.display = 'flex';
     });
 
-    useDataBtn.addEventListener('click', () => {
+    useDataBtn.addEventListener('click', async () => {
       if (!commentsInput.value.trim()) return alert('Paste comments JSON');
       try {
         localStorage.setItem('commentsJSON', commentsInput.value);
         localStorage.setItem('pcaJSON', pcaInput.value);
         const comments = JSON.parse(commentsInput.value);
+
+        // Try to get "n" from PCA data if available
+        if (pcaInput.value.trim()) {
+          try {
+            const pcaData = JSON.parse(pcaInput.value);
+            if (pcaData.n && typeof pcaData.n === 'number') {
+              console.log('Found n value in PCA data:', pcaData.n);
+              updateSliderRange(pcaData.n);
+            }
+          } catch (pcaError) {
+            console.warn('Could not parse PCA data for n value:', pcaError);
+          }
+        }
 
         // --- table header reordered: agree, pass, disagree ---
         let html = '<table><thead><tr><th>ID</th><th>Text</th><th class="small">Agree</th><th class="small">Pass</th><th class="small">Disagree</th></tr></thead><tbody>';
