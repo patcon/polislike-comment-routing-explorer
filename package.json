@@ -1,0 +1,23 @@
+{
+  "name": "polislike-comment-routing-explorer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "serve .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patcon/polislike-comment-routing-explorer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/patcon/polislike-comment-routing-explorer/issues"
+  },
+  "homepage": "https://github.com/patcon/polislike-comment-routing-explorer#readme",
+  "devDependencies": {
+    "serve": "^14.2.5"
+  }
+}
